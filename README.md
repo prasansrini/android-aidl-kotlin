@@ -1,2 +1,4 @@
 # android-aidl-kotlin
-Application for AIDL implementation using Kotlin.
+
+## Application to demonstrate AIDL IPC using an example of ServerSocket.
+## Implemented callbacks using AIDL for event based communication. 
