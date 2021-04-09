@@ -1,11 +1,12 @@
 // IMyAidlInterface.aidl
 package com.learn.androidaidl.k;
 
+import com.learn.androidaidl.k.model.TransportInfo;
 import com.learn.androidaidl.k.model.DataModel;
-import com.learn.androidaidl.k.callbacks.IFetchUpdatedListCallback;
+import com.learn.androidaidl.k.callbacks.IServerConnectionCallback;
 
 interface IMyAidlInterface {
-    String getMessage();
-    void setDataModel(in DataModel dataModel);
-    void fetchUpdatedList(in DataModel dataModel, in IFetchUpdatedListCallback iFetchUpdatedListCallback);
+    void buildServer(in TransportInfo transportInfo);
+    void startServer(in IServerConnectionCallback iServerConnectionCallback);
+    void stopServer();
 }

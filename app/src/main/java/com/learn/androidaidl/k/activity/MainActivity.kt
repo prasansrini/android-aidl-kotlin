@@ -1,5 +1,6 @@
 package com.learn.androidaidl.k.activity
 
+import android.app.Activity
 import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
@@ -9,39 +10,30 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
 import android.view.View
-import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import com.learn.androidaidl.k.IMyAidlInterface
 import com.learn.androidaidl.k.R
-import com.learn.androidaidl.k.callbacks.IFetchUpdatedListCallback
-import com.learn.androidaidl.k.model.DataModel
+import com.learn.androidaidl.k.callbacks.IServerConnectionCallback
+import com.learn.androidaidl.k.model.TransportInfo
 import com.learn.androidaidl.k.service.MyService
-import java.util.*
+import kotlinx.android.synthetic.main.activity_main.*
 
-class MainActivity : AppCompatActivity() {
-    private var mIMyAidlInterface: IMyAidlInterface? = null
-    private val mIFetchUpdatedListCallback: IFetchUpdatedListCallback =
-        object : IFetchUpdatedListCallback.Stub() {
-            override fun onListUpdated(dataModel: DataModel) {
-                Log.v(TAG, dataModel.toString())
-            }
+class MainActivity : Activity() {
+    private var mServerImplService: IMyAidlInterface? = null
 
-            override fun asBinder(): IBinder {
-                return this
-            }
-        }
     private val mServiceConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(
             componentName: ComponentName,
             iBinder: IBinder
         ) {
-            mIMyAidlInterface = IMyAidlInterface.Stub.asInterface(iBinder)
+            mServerImplService = IMyAidlInterface.Stub.asInterface(iBinder)
             Toast.makeText(this@MainActivity, "Service connected.", Toast.LENGTH_SHORT).show()
+            val transportInfo = TransportInfo("127.0.0.1", 9130)
+            mServerImplService!!.buildServer(transportInfo)
         }
 
         override fun onServiceDisconnected(componentName: ComponentName) {
-            mIMyAidlInterface = null
+            mServerImplService = null
             Toast.makeText(this@MainActivity, "Service disconnected.", Toast.LENGTH_SHORT).show()
         }
     }
@@ -62,22 +54,19 @@ class MainActivity : AppCompatActivity() {
 
     fun onButtonClick(view: View?) {
         try {
-            if (mIMyAidlInterface != null) {
-                val value = mIMyAidlInterface!!.message
-                val listArray: MutableList<String> =
-                    ArrayList()
-                listArray.add("10")
-                listArray.add("11")
-                listArray.add("12")
-                val dataModel = DataModel("Data", 12, listArray, true)
-                mIMyAidlInterface!!.fetchUpdatedList(
-                    dataModel,
-                    mIFetchUpdatedListCallback
-                )
-                (findViewById<View>(R.id.result) as TextView).text = value
-                Log.v(TAG, value)
+            if (mServerImplService != null) {
+                mServerImplService?.startServer(object : IServerConnectionCallback.Stub() {
+                    override fun disconnected(transportInfo: TransportInfo?, cause: String) {
+                        result.text = "Disconnected due to $cause!"
+                    }
+
+                    override fun onConnected(transportInfo: TransportInfo?) {
+                        result.text =
+                            "Connected to ${transportInfo?.ipAddress}:${transportInfo?.port}"
+                    }
+                })
             } else {
-                Log.v(TAG, "AIDL not initialized.")
+                Log.v(TAG, "Service not initialized.")
             }
         } catch (e: RemoteException) {
             Log.e(TAG, e.localizedMessage, e)
@@ -86,6 +75,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        mServerImplService?.stopServer()
+        mServerImplService = null
         unbindService(mServiceConnection)
     }
 

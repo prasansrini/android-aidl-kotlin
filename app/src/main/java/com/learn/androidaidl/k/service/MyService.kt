@@ -2,38 +2,40 @@ package com.learn.androidaidl.k.service
 
 import android.app.Service
 import android.content.Intent
-import android.os.Handler
 import android.os.IBinder
-import android.os.RemoteException
-import android.util.Log
 import com.learn.androidaidl.k.IMyAidlInterface
-import com.learn.androidaidl.k.callbacks.IFetchUpdatedListCallback
-import com.learn.androidaidl.k.model.DataModel
+import com.learn.androidaidl.k.callbacks.IServerConnectionCallback
+import com.learn.androidaidl.k.model.TransportInfo
+import com.learn.androidaidl.k.service.server.ServerImpl
+import java.net.InetAddress
 
 class MyService : Service() {
+    private lateinit var mTransportInfo: TransportInfo
+
     private val mIMyAidlInterface: IMyAidlInterface.Stub = object : IMyAidlInterface.Stub() {
-        override fun getMessage(): String {
-            return "Hello"
-        }
-
-        override fun setDataModel(dataModel: DataModel) {
-            Log.e(TAG, dataModel.toString())
-        }
-
-        override fun fetchUpdatedList(
-            dataModel: DataModel,
-            iFetchUpdatedListCallback: IFetchUpdatedListCallback
+        override fun buildServer(
+            transportInfo: TransportInfo
         ) {
-            Handler().postDelayed({
-                try {
-                    for (i in dataModel.list!!.indices) {
-                        dataModel.list!!.set(i, "" + i)
-                    }
-                    iFetchUpdatedListCallback.onListUpdated(dataModel)
-                } catch (e: RemoteException) {
-                    Log.e(TAG, e.localizedMessage, e)
+            mTransportInfo = transportInfo
+            ServerImpl.buildServer(
+                transportInfo.port,
+                InetAddress.getByName(transportInfo.ipAddress)
+            )
+        }
+
+        override fun startServer(iServerConnectionCallback: IServerConnectionCallback?) {
+            val connectionStatus = ServerImpl.instance?.startServerAsync()
+            connectionStatus?.invokeOnCompletion { cause ->
+                if (cause == null) {
+                    iServerConnectionCallback?.onConnected(mTransportInfo)
+                } else {
+                    iServerConnectionCallback?.disconnected(mTransportInfo, cause.localizedMessage)
                 }
-            }, TIME_OUT.toLong())
+            }
+        }
+
+        override fun stopServer() {
+            ServerImpl.instance?.stopServer()
         }
     }
 
@@ -41,8 +43,4 @@ class MyService : Service() {
         return mIMyAidlInterface
     }
 
-    companion object {
-        private const val TIME_OUT = 1000
-        private const val TAG = "MyService"
-    }
 }
